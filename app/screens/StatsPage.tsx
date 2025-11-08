@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { BarChart } from "react-native-chart-kit";
 
-// ✅ ナビゲーション型定義
 type RootStackParamList = {
   Home: undefined;
   Stats: undefined;
@@ -20,7 +19,7 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Stats">;
 
-// ✅ 日付フォーマット関数
+// ✅ 日付を短く整形
 const toShortLabel = (iso: string): string => {
   try {
     const d = new Date(iso);
@@ -44,7 +43,7 @@ export default function StatsPage() {
   const navigation = useNavigation<NavigationProp>();
   const [data, setData] = useState<StatData[]>([]);
 
-  // ✅ データ読み込み
+  // ✅ データ取得
   useEffect(() => {
     (async () => {
       try {
@@ -65,11 +64,11 @@ export default function StatsPage() {
           }))
           .sort((a, b) => (a.date < b.date ? -1 : 1));
 
-        // ✅ データ補完
+        // ✅ 日数を7日に揃える
         if (arr.length > 0) {
-          const lastDate = arr[arr.length - 1].date;
+          const base = arr[arr.length - 1].date;
           while (arr.length < 7) {
-            const nextDate = addDays(lastDate, arr.length - (arr.length - 1));
+            const nextDate = addDays(base, arr.length - (arr.length - 1));
             arr.push({ date: nextDate, value: 0, label: toShortLabel(nextDate) });
           }
         } else {
@@ -94,20 +93,24 @@ export default function StatsPage() {
     <ScrollView style={styles.container}>
       {/* 💙 ヘッダー */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.navigate("Home")} style={styles.iconButton}>
-          <Ionicons name="chevron-back" size={30} color="#6B7280" />
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Home")}
+          style={styles.iconButton}
+        >
+          <Ionicons name="chevron-back" size={28} color="#6B7280" />
         </TouchableOpacity>
-        <Text style={styles.title}>今週のがんばり</Text>
-        <View style={{ width: 30 }} />
+        <Text style={styles.title}>達成グラフ</Text>
+        <View style={{ width: 28 }} />
       </View>
 
-      <Text style={styles.subtitle}>小さな積み重ねが、あなたの力になる</Text>
+      <Text style={styles.subtitle}>小さな積み重ねが、大きな力になる</Text>
 
       {/* 📊 グラフカード */}
       <View style={styles.chartCard}>
         {data.length === 0 ? (
           <Text style={styles.emptyText}>
-            まだ達成データがありません。タスクを完了すると自動で記録されます
+            まだ達成データがありません。
+            {"\n"}タスクを完了すると自動で記録されます。
           </Text>
         ) : (
           <BarChart
@@ -122,9 +125,8 @@ export default function StatsPage() {
             yAxisLabel=""
             yAxisSuffix=""
             chartConfig={{
-              backgroundColor: "#fff",
-              backgroundGradientFrom: "#E0ECFF",
-              backgroundGradientTo: "#fff",
+              backgroundGradientFrom: "#FFFFFF",
+              backgroundGradientTo: "#FFFFFF",
               decimalPlaces: 0,
               color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
               labelColor: (opacity = 1) => `rgba(30, 41, 59, ${opacity})`,
@@ -132,18 +134,18 @@ export default function StatsPage() {
                 strokeWidth: 1,
                 stroke: "#E2E8F0",
               },
-              style: { borderRadius: 16 },
             }}
-            style={{ marginVertical: 8, borderRadius: 16 }}
+            style={styles.chart}
           />
         )}
       </View>
 
-      {/* 📅 解説カード */}
-      <View style={styles.tipsCard}>
-        <Ionicons name="sparkles" size={22} color="#3B82F6" />
-        <Text style={styles.tipsText}>
-          日々少しずつでも続けることが大事。{"\n"}グラフが伸びていくのを楽しもう
+      {/* 📅 アドバイスカード */}
+      <View style={styles.tipCard}>
+        <Ionicons name="sparkles" size={22} color="#2563EB" />
+        <Text style={styles.tipText}>
+          毎日少しずつの積み上げが大事。
+          {"\n"}グラフが伸びるのを楽しもう！
         </Text>
       </View>
     </ScrollView>
@@ -151,7 +153,7 @@ export default function StatsPage() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0F7FF", padding: 20 },
+  container: { flex: 1, backgroundColor: "#FFFFFF", padding: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -159,24 +161,29 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   iconButton: { padding: 4 },
-  title: { fontSize: 26, fontWeight: "700", color: "#1E40AF" },
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
   subtitle: {
     textAlign: "center",
-    color: "#475569",
-    fontSize: 15,
+    color: "#64748B",
+    fontSize: 14,
     marginBottom: 18,
   },
   chartCard: {
-    backgroundColor: "#fff",
+    backgroundColor: "#F8FAFC",
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6,
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
   },
-  tipsCard: {
+  chart: { marginVertical: 8, borderRadius: 16 },
+  tipCard: {
     backgroundColor: "#DBEAFE",
     borderRadius: 14,
     padding: 14,
@@ -184,16 +191,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  tipsText: {
+  tipText: {
     marginLeft: 10,
     color: "#1E3A8A",
     fontSize: 15,
     flexShrink: 1,
+    lineHeight: 20,
   },
   emptyText: {
     textAlign: "center",
     color: "#94A3B8",
     fontSize: 15,
     padding: 20,
+    lineHeight: 22,
   },
 });

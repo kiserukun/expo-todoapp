@@ -36,3 +36,9 @@ export const deleteGroup = async (id: string) => {
   const updated = groups.filter((g) => g.id !== id);
   await saveGroups(updated);
 };
+
+export const updateGroupName = async (id: string, newName: string) => {
+  const stored = await loadGroups();
+  const updated = stored.map((g) => (g.id === id ? { ...g, name: newName } : g));
+  await AsyncStorage.setItem("groups", JSON.stringify(updated));
+};

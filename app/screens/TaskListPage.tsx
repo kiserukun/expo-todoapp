@@ -11,9 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DraggableFlatList, {
-  RenderItemParams,
-} from "react-native-draggable-flatlist";
+import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
 import Toast from "react-native-toast-message";
 
 type Task = { id: string; text: string; completed: boolean };
@@ -30,6 +28,7 @@ export default function TaskListPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [group, setGroup] = useState<Group | null>(null);
   const [newTask, setNewTask] = useState("");
+  const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
@@ -64,26 +63,42 @@ export default function TaskListPage() {
     await updateGroupData(newGroups);
   };
 
-  const handleAddTask = async () => {
-    if (!newTask.trim()) return;
-    if (!group) return;
+  const handleAddOrEditTask = async () => {
+    if (!newTask.trim() || !group) return;
 
-    const newGroups = groups.map((g) =>
-      g.id === id
-        ? {
-          ...g,
-          tasks: [
-            ...g.tasks,
-            { id: Date.now().toString(), text: newTask.trim(), completed: false },
-          ],
-        }
-        : g
-    );
+    let newGroups: Group[];
+
+    if (editTaskId) {
+      // 編集モード
+      newGroups = groups.map((g) =>
+        g.id === id
+          ? {
+            ...g,
+            tasks: g.tasks.map((t) =>
+              t.id === editTaskId ? { ...t, text: newTask.trim() } : t
+            ),
+          }
+          : g
+      );
+    } else {
+      // 新規追加
+      newGroups = groups.map((g) =>
+        g.id === id
+          ? {
+            ...g,
+            tasks: [
+              ...g.tasks,
+              { id: Date.now().toString(), text: newTask.trim(), completed: false },
+            ],
+          }
+          : g
+      );
+    }
+
     await updateGroupData(newGroups);
-
     setNewTask("");
+    setEditTaskId(null);
     setModalVisible(false);
-
   };
 
   const handleDeleteTask = async (taskId: string) => {
@@ -98,87 +113,119 @@ export default function TaskListPage() {
             g.id === id ? { ...g, tasks: g.tasks.filter((t) => t.id !== taskId) } : g
           );
           await updateGroupData(newGroups);
-          Toast.show({ type: "info", text1: "タスクを削除しました🗑️" });
         },
       },
     ]);
   };
 
   if (!group)
-    return <Text style={{ textAlign: "center", marginTop: 40 }}>グループが見つかりません。</Text>;
+    return <Text style={{ textAlign: "center", marginTop: 40 }}>リストが見つかりません。</Text>;
 
-  const renderItem = ({ item, drag, isActive }: RenderItemParams<Task>) => {
-    return (
-      <TouchableOpacity
-        style={[
-          styles.taskCard,
-          item.completed && styles.taskCompleted,
-          isActive && { backgroundColor: "#BFDBFE" },
-        ]}
-        onPress={() => handleToggle(item.id)}
-        onLongPress={drag} // 長押しでドラッグ開始
-      >
-        <View style={styles.taskRow}>
-          <Ionicons
-            name={item.completed ? "checkmark-circle" : "ellipse-outline"}
-            size={30}
-            color={item.completed ? "#34D399" : "#93C5FD"}
-            style={{ marginRight: 12 }}
-          />
-          <Text style={[styles.taskText, item.completed && styles.taskTextDone]}>
-            {item.text}
-          </Text>
+  const renderItem = ({ item, drag, isActive }: RenderItemParams<Task>) => (
+    <TouchableOpacity
+      style={[
+        styles.taskCard,
+        item.completed && styles.taskCompleted,
+        isActive && { backgroundColor: "#DBEAFE" },
+      ]}
+      onPress={() => handleToggle(item.id)}
+      onLongPress={drag}
+    >
+      <View style={styles.taskRow}>
+        <Ionicons
+          name={item.completed ? "checkmark-circle" : "ellipse-outline"}
+          size={26}
+          color={item.completed ? "#22C55E" : "#60A5FA"}
+          style={{ marginRight: 10 }}
+        />
+        <Text
+          style={[styles.taskText, item.completed && styles.taskTextDone]}
+          onLongPress={() => {
+            setEditTaskId(item.id);
+            setNewTask(item.text);
+            setModalVisible(true);
+          }}
+        >
+          {item.text}
+        </Text>
+        <View style={{ flexDirection: "row", marginLeft: "auto" }}>
+          {/* ✏️ 編集ボタン */}
           <TouchableOpacity
-            onPress={() => handleDeleteTask(item.id)}
-            style={{ marginLeft: "auto" }}
+            onPress={(e) => {
+              e.stopPropagation();
+              setEditTaskId(item.id);
+              setNewTask(item.text);
+              setModalVisible(true);
+            }}
+            style={{ marginRight: 12 }}
           >
-            <Ionicons name="trash" size={24} color="#878282ff" />
+            <Ionicons name="create-outline" size={22} color="#64748B" />
+          </TouchableOpacity>
+
+          {/* 🗑️ 削除ボタン */}
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation();
+              handleDeleteTask(item.id);
+            }}
+          >
+            <Ionicons name="trash-outline" size={22} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
-    );
-  };
+      </View>
+    </TouchableOpacity>
+  );
+
+  const completed = group.tasks.filter((t) => t.completed).length;
+  const total = group.tasks.length;
+  const ratio = total > 0 ? completed / total : 0;
 
   return (
     <View style={styles.container}>
+      {/* 🔹 ヘッダー */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={30} color="#6B7280" />
+          <Ionicons name="chevron-back" size={28} color="#6B7280" />
         </TouchableOpacity>
         <Text style={styles.title}>{group.name}</Text>
-        <View style={{ width: 30 }} />
+        <View style={{ width: 28 }} />
       </View>
 
-      <View style={styles.progressCard}>
+      {/* 💙 進捗カード */}
+      <View style={[styles.progressCard, { backgroundColor: `rgba(37,99,235,${0.1 + ratio * 0.3})` }]}>
         <Text style={styles.counterLabel}>今日の達成</Text>
         <Text style={styles.counterValue}>
-          {group.tasks.filter((t) => t.completed).length} / {group.tasks.length}
+          {completed} / {total}
         </Text>
       </View>
 
-      <View style={{ flex: 1 }}>
-        <DraggableFlatList
-          data={group.tasks}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          onDragEnd={({ data }) => {
-            const newGroups = groups.map((g) => (g.id === id ? { ...g, tasks: data } : g));
-            updateGroupData(newGroups);
-          }}
-          contentContainerStyle={{ paddingBottom: 120 }} // 👈 スクロール余白
-        />
-      </View>
+      {/* 🧾 タスクリスト */}
+      <DraggableFlatList
+        data={group.tasks}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        onDragEnd={({ data }) => {
+          const newGroups = groups.map((g) =>
+            g.id === id ? { ...g, tasks: data } : g
+          );
+          updateGroupData(newGroups);
+        }}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      />
 
+      {/* ➕ 追加ボタン */}
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => {
+          setEditTaskId(null);
           setNewTask("");
           setModalVisible(true);
         }}
       >
-        <Text style={styles.addButtonText}>＋</Text>
+        <Ionicons name="add" size={32} color="#fff" />
       </TouchableOpacity>
 
+      {/* 📝 モーダル（追加・編集兼用） */}
       <Modal
         visible={modalVisible}
         animationType="fade"
@@ -186,11 +233,14 @@ export default function TaskListPage() {
         onRequestClose={() => {
           setModalVisible(false);
           setNewTask("");
+          setEditTaskId(null);
         }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>新しいタスク</Text>
+            <Text style={styles.modalTitle}>
+              {editTaskId ? "タスクを編集" : "新しいタスクを追加"}
+            </Text>
             <TextInput
               style={styles.modalInput}
               placeholder="やることを入力..."
@@ -198,13 +248,16 @@ export default function TaskListPage() {
               onChangeText={setNewTask}
               autoFocus
             />
-            <TouchableOpacity style={styles.modalButton} onPress={handleAddTask}>
-              <Text style={styles.modalButtonText}>追加する</Text>
+            <TouchableOpacity style={styles.modalButton} onPress={handleAddOrEditTask}>
+              <Text style={styles.modalButtonText}>
+                {editTaskId ? "更新する" : "追加する"}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
                 setModalVisible(false);
                 setNewTask("");
+                setEditTaskId(null);
               }}
             >
               <Text style={styles.cancelText}>キャンセル</Text>
@@ -218,67 +271,42 @@ export default function TaskListPage() {
   );
 }
 
-// --- styles はそのまま利用 ---
-
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0F7FF", padding: 16 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  title: { fontSize: 26, fontWeight: "700", color: "#1E40AF" },
-
+  container: { flex: 1, backgroundColor: "#FFFFFF", paddingHorizontal: 20, paddingTop: 16 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  title: { fontSize: 22, fontWeight: "700", color: "#1E293B" },
   progressCard: {
-    backgroundColor: "#DBEAFE",
-    borderRadius: 14,
-    padding: 18,
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  counterLabel: { fontSize: 16, color: "#3B82F6" },
-  counterValue: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#1E3A8A",
-    marginTop: 6,
-  },
-
+  counterLabel: { fontSize: 16, color: "#2563EB", fontWeight: "500" },
+  counterValue: { fontSize: 28, fontWeight: "700", color: "#1E40AF", marginTop: 4 },
   taskCard: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
   },
   taskCompleted: { backgroundColor: "#DCFCE7" },
   taskRow: { flexDirection: "row", alignItems: "center" },
-  taskText: { fontSize: 18, color: "#1F2937", flexShrink: 1 },
-  taskTextDone: { textDecorationLine: "line-through", color: "#6B7280" },
-
-  deleteAction: {
-    backgroundColor: "#F87171",
-    justifyContent: "center",
-    alignItems: "center",
-    width: 80,
-    marginBottom: 10,
-    borderRadius: 14,
-  },
-
+  taskText: { fontSize: 16, color: "#1E293B", flexShrink: 1 },
+  taskTextDone: { textDecorationLine: "line-through", color: "#94A3B8" },
   addButton: {
     position: "absolute",
     bottom: 30,
     right: 30,
-    backgroundColor: "#3B82F6",
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    backgroundColor: "#2563EB",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -286,38 +314,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 6,
   },
-  addButtonText: { fontSize: 40, color: "#fff", marginTop: -3 },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalBox: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 22,
-    width: "80%",
-    alignItems: "center",
-  },
-  modalTitle: { fontSize: 20, fontWeight: "600", color: "#1E3A8A", marginBottom: 10 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)", justifyContent: "center", alignItems: "center" },
+  modalBox: { backgroundColor: "#fff", borderRadius: 16, padding: 22, width: "80%", alignItems: "center" },
+  modalTitle: { fontSize: 18, fontWeight: "600", color: "#1E293B", marginBottom: 10 },
   modalInput: {
     borderWidth: 1,
     borderColor: "#CBD5E1",
-    borderRadius: 10,
+    borderRadius: 8,
     width: "100%",
-    padding: 12,
+    padding: 10,
     marginBottom: 14,
     fontSize: 16,
   },
-  modalButton: {
-    backgroundColor: "#3B82F6",
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  modalButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-  cancelText: { color: "#6B7280", marginTop: 12, fontSize: 16 },
-  emptyText: { textAlign: "center", color: "#94A3B8", marginTop: 30, fontSize: 16 },
+  modalButton: { backgroundColor: "#2563EB", borderRadius: 8, paddingVertical: 10, paddingHorizontal: 24 },
+  modalButtonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  cancelText: { color: "#64748B", marginTop: 12, fontSize: 15 },
 });

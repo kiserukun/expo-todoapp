@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import {
   FlatList,
   Modal,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -12,7 +13,7 @@ import {
   View,
 } from "react-native";
 import type { RootStackParamList } from "../index";
-import { addGroup, deleteGroup, Group, loadGroups } from "../utils/storage";
+import { addGroup, deleteGroup, Group, loadGroups, updateGroupName } from "../utils/storage";
 
 type GroupListNav = StackNavigationProp<RootStackParamList, "Home">;
 
@@ -20,6 +21,7 @@ const HomeScreen = () => {
   const navigation = useNavigation<GroupListNav>();
   const [groups, setGroups] = useState<Group[]>([]);
   const [newGroupName, setNewGroupName] = useState("");
+  const [editGroupId, setEditGroupId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   const fetchGroups = async () => {
@@ -32,10 +34,21 @@ const HomeScreen = () => {
     return unsubscribe;
   }, [navigation]);
 
+  // 🟦 追加
   const handleAddGroup = async () => {
     if (!newGroupName.trim()) return;
     await addGroup(newGroupName.trim());
-    setNewGroupName(""); // ← 追加後にリセット
+    setNewGroupName("");
+    setModalVisible(false);
+    fetchGroups();
+  };
+
+  // 🟨 編集
+  const handleEditGroup = async () => {
+    if (!newGroupName.trim() || !editGroupId) return;
+    await updateGroupName(editGroupId, newGroupName.trim());
+    setEditGroupId(null);
+    setNewGroupName("");
     setModalVisible(false);
     fetchGroups();
   };
@@ -47,46 +60,65 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* 教訓ノートボタン */}
-      <TouchableOpacity
-        style={[styles.menuButton, { backgroundColor: "#FBBF24" }]}
-        onPress={() => navigation.navigate("MemoList")}
-      >
-        <View style={styles.menuContent}>
-          <Ionicons name="book-outline" size={22} color="white" style={styles.icon} />
-          <Text style={styles.menuButtonText}>教訓ノート</Text>
-        </View>
-      </TouchableOpacity>
+      {/* 教訓ノート＆達成グラフカード */}
+      <View style={styles.menuContainer}>
+        <TouchableOpacity
+          style={styles.cardButton}
+          onPress={() => navigation.navigate("MemoList")}
+        >
+          <Ionicons name="book-outline" size={20} color="#2563EB" />
+          <Text style={styles.cardText}>教訓ノート</Text>
+        </TouchableOpacity>
 
-      {/* 達成グラフボタン */}
-      <TouchableOpacity
-        style={[styles.menuButton, { backgroundColor: "#38BDF8" }]}
-        onPress={() => navigation.navigate("Stats")}
-      >
-        <View style={styles.menuContent}>
-          <Ionicons name="bar-chart-outline" size={22} color="white" style={styles.icon} />
-          <Text style={styles.menuButtonText}>達成グラフ</Text>
-        </View>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.cardButton}
+          onPress={() => navigation.navigate("Stats")}
+        >
+          <Ionicons name="bar-chart-outline" size={20} color="#2563EB" />
+          <Text style={styles.cardText}>達成グラフ</Text>
+        </TouchableOpacity>
+      </View>
 
       <Text style={styles.header}>マイリスト</Text>
 
-      {/* グループ一覧 */}
       <FlatList
         data={groups}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.groupCard}>
-            <TouchableOpacity
-              style={styles.groupContent}
-              onPress={() => navigation.navigate("TaskList", { id: item.id })}
-            >
-              <Text style={styles.groupText}>{item.name}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleDeleteGroup(item.id)}>
-              <Ionicons name="trash" size={24} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.groupCard,
+              pressed && { backgroundColor: "#E2E8F0" },
+            ]}
+            onPress={() => navigation.navigate("TaskList", { id: item.id })}
+          >
+            <Text style={styles.groupText}>{item.name}</Text>
+
+            <View style={styles.iconRow}>
+              {/* ✏️ 編集ボタン */}
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setEditGroupId(item.id);
+                  setNewGroupName(item.name);
+                  setModalVisible(true);
+                }}
+                style={{ marginRight: 12 }}
+              >
+                <Ionicons name="create-outline" size={22} color="#64748B" />
+              </TouchableOpacity>
+
+              {/* 🗑️ 削除ボタン */}
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeleteGroup(item.id);
+                }}
+              >
+                <Ionicons name="trash-outline" size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+          </Pressable>
         )}
         ListEmptyComponent={
           <Text style={styles.emptyText}>まだリストがありません</Text>
@@ -94,22 +126,26 @@ const HomeScreen = () => {
         contentContainerStyle={{ paddingBottom: 120 }}
       />
 
-      {/* グループ追加ボタン */}
+      {/* ➕ 追加ボタン */}
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => {
-          setNewGroupName(""); // ← モーダルを開く前に入力内容をリセット
+          setNewGroupName("");
+          setEditGroupId(null);
           setModalVisible(true);
         }}
       >
-        <Text style={{ color: "#fff", fontSize: 36 }}>＋</Text>
+        <Ionicons name="add" size={32} color="#fff" />
       </TouchableOpacity>
 
-      {/* モーダル */}
+      {/* モーダル（追加・編集兼用） */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>新しいリストを作成</Text>
+            <Text style={styles.modalTitle}>
+              {editGroupId ? "リスト名を編集" : "新しいリストを作成"}
+            </Text>
+
             <TextInput
               placeholder="リスト名を入力..."
               value={newGroupName}
@@ -117,13 +153,21 @@ const HomeScreen = () => {
               style={styles.modalInput}
               autoFocus
             />
-            <TouchableOpacity style={styles.modalButton} onPress={handleAddGroup}>
-              <Text style={styles.modalButtonText}>追加する</Text>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={editGroupId ? handleEditGroup : handleAddGroup}
+            >
+              <Text style={styles.modalButtonText}>
+                {editGroupId ? "更新する" : "追加する"}
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               onPress={() => {
                 setModalVisible(false);
-                setNewGroupName(""); // ← キャンセル時もリセット
+                setNewGroupName("");
+                setEditGroupId(null);
               }}
             >
               <Text style={styles.cancelText}>キャンセル</Text>
@@ -137,37 +181,55 @@ const HomeScreen = () => {
 
 export default HomeScreen;
 
+// 🧩 storage.ts に以下の関数を追加
+// export const updateGroupName = async (id: string, newName: string) => {
+//   const stored = await loadGroups();
+//   const updated = stored.map((g) => (g.id === id ? { ...g, name: newName } : g));
+//   await AsyncStorage.setItem("groups", JSON.stringify(updated));
+// };
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0F7FF", padding: 16 },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#1E3A8A",
-    marginVertical: 12,
+  container: { flex: 1, backgroundColor: "#FFFFFF", paddingHorizontal: 20, paddingTop: 16 },
+  header: { fontSize: 20, fontWeight: "600", color: "#1E293B", marginVertical: 16 },
+  menuContainer: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  cardButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginHorizontal: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
   },
+  cardText: { fontSize: 15, fontWeight: "600", color: "#2563EB", marginLeft: 6 },
   groupCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#F8FAFC",
     padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
+    borderRadius: 12,
+    marginBottom: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
   },
-  groupContent: { flex: 1 },
-  groupText: { fontSize: 18, color: "#1E3A8A" },
+  groupText: { fontSize: 16, color: "#1E293B" },
+  iconRow: { flexDirection: "row", alignItems: "center" },
   addButton: {
     position: "absolute",
     bottom: 30,
     right: 30,
-    backgroundColor: "#3B82F6",
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    backgroundColor: "#2563EB",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -175,67 +237,25 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 6,
   },
-  emptyText: {
-    textAlign: "center",
-    color: "#94A3B8",
-    marginTop: 30,
-    fontSize: 16,
-  },
+  emptyText: { textAlign: "center", color: "#94A3B8", marginTop: 30, fontSize: 15 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
     justifyContent: "center",
     alignItems: "center",
   },
-  modalBox: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 22,
-    width: "80%",
-    alignItems: "center",
-  },
-  modalTitle: { fontSize: 20, fontWeight: "600", color: "#1E3A8A", marginBottom: 12 },
+  modalBox: { backgroundColor: "#fff", borderRadius: 16, padding: 20, width: "80%", alignItems: "center" },
+  modalTitle: { fontSize: 18, fontWeight: "600", color: "#1E293B", marginBottom: 12 },
   modalInput: {
     borderWidth: 1,
     borderColor: "#CBD5E1",
-    borderRadius: 10,
+    borderRadius: 8,
     width: "100%",
-    padding: 12,
-    marginBottom: 14,
-    fontSize: 16,
-  },
-  modalButton: {
-    backgroundColor: "#3B82F6",
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    marginBottom: 8,
-  },
-  modalButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-  cancelText: { color: "#6B7280", fontSize: 16, marginTop: 4 },
-  menuButton: {
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    padding: 10,
     marginBottom: 12,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 3,
-  },
-  menuButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
     fontSize: 16,
   },
-  menuContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  icon: {
-    marginRight: 8,
-  },
+  modalButton: { backgroundColor: "#2563EB", borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20, marginBottom: 6 },
+  modalButtonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  cancelText: { color: "#64748B", fontSize: 15, marginTop: 4 },
 });

@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -19,6 +20,7 @@ export default function MemoListPage() {
   const navigation = useNavigation();
   const [memos, setMemos] = useState<Memo[]>([]);
   const [newMemo, setNewMemo] = useState("");
+  const [editId, setEditId] = useState<number | null>(null);
   const [isModalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
@@ -33,18 +35,39 @@ export default function MemoListPage() {
     await AsyncStorage.setItem("memos", JSON.stringify(list));
   };
 
-  const handleAddMemo = async () => {
+  const handleAddOrEditMemo = async () => {
     if (!newMemo.trim()) return;
-    const updated = [...memos, { id: Date.now(), text: newMemo.trim() }];
+    let updated: Memo[];
+
+    if (editId !== null) {
+      // 編集
+      updated = memos.map((m) => (m.id === editId ? { ...m, text: newMemo.trim() } : m));
+
+    } else {
+      // 追加
+      updated = [...memos, { id: Date.now(), text: newMemo.trim() }];
+
+    }
+
     await saveMemos(updated);
     setNewMemo("");
+    setEditId(null);
     setModalVisible(false);
   };
 
   const handleDeleteMemo = async (id: number) => {
-    const updated = memos.filter((m) => m.id !== id);
-    await saveMemos(updated);
-    Toast.show({ type: "info", text1: "教訓を削除しました🗑️" });
+    Alert.alert("削除確認", "この教訓を削除しますか？", [
+      { text: "キャンセル", style: "cancel" },
+      {
+        text: "削除",
+        style: "destructive",
+        onPress: async () => {
+          const updated = memos.filter((m) => m.id !== id);
+          await saveMemos(updated);
+
+        },
+      },
+    ]);
   };
 
   return (
@@ -52,32 +75,51 @@ export default function MemoListPage() {
       {/* 💙 ヘッダー */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={30} color="#6B7280" />
+          <Ionicons name="chevron-back" size={28} color="#6B7280" />
         </TouchableOpacity>
-        <Text style={styles.title}>過去の教訓</Text>
-        <View style={{ width: 30 }} />
+        <Text style={styles.title}>教訓ノート</Text>
+        <View style={{ width: 28 }} />
       </View>
 
       <Text style={styles.subtitle}>
-        過去の失敗や気づきをメモして{"\n"}定期的に振り返ろう
+        過去の失敗や気づきを記録して{"\n"}定期的に振り返ろう
       </Text>
 
       {/* 🧠 メモリスト */}
       {memos.length === 0 ? (
         <Text style={styles.emptyText}>
-          まだメモがありません。下の「＋」から追加できます。
+          まだ教訓がありません。{"\n"}右下の「＋」から追加できます。
         </Text>
       ) : (
         <FlatList
           data={memos}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
-            <View style={styles.memoCard}>
+            <TouchableOpacity
+              style={styles.memoCard}
+              onPress={() => {
+                setEditId(item.id);
+                setNewMemo(item.text);
+                setModalVisible(true);
+              }}
+            >
               <Text style={styles.memoText}>{item.text}</Text>
-              <TouchableOpacity onPress={() => handleDeleteMemo(item.id)}>
-                <Ionicons name="trash" size={24} color="#878282ff" />
-              </TouchableOpacity>
-            </View>
+              <View style={styles.iconRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setEditId(item.id);
+                    setNewMemo(item.text);
+                    setModalVisible(true);
+                  }}
+                  style={{ marginRight: 10 }}
+                >
+
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDeleteMemo(item.id)}>
+                  <Ionicons name="trash-outline" size={22} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
           )}
           contentContainerStyle={{ paddingBottom: 120 }}
         />
@@ -86,35 +128,49 @@ export default function MemoListPage() {
       {/* ➕ 追加ボタン */}
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => setModalVisible(true)}
+        onPress={() => {
+          setEditId(null);
+          setNewMemo("");
+          setModalVisible(true);
+        }}
       >
-        <Text style={styles.addButtonText}>＋</Text>
+        <Ionicons name="add" size={32} color="#fff" />
       </TouchableOpacity>
 
-      {/* ✨ モーダル */}
+      {/* ✨ モーダル（追加・編集共通） */}
       <Modal
         visible={isModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          setModalVisible(false);
+          setNewMemo("");
+          setEditId(null);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>新しい教訓</Text>
+            <Text style={styles.modalTitle}>
+              {editId ? "教訓を編集" : "新しい教訓を追加"}
+            </Text>
             <TextInput
               style={styles.modalInput}
               placeholder="例：焦って確認を忘れた…次は落ち着こう"
               value={newMemo}
               onChangeText={setNewMemo}
               autoFocus
+              multiline
             />
-            <TouchableOpacity style={styles.modalButton} onPress={handleAddMemo}>
-              <Text style={styles.modalButtonText}>追加する</Text>
+            <TouchableOpacity style={styles.modalButton} onPress={handleAddOrEditMemo}>
+              <Text style={styles.modalButtonText}>
+                {editId ? "更新する" : "追加する"}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
                 setModalVisible(false);
                 setNewMemo("");
+                setEditId(null);
               }}
             >
               <Text style={styles.cancelText}>キャンセル</Text>
@@ -129,45 +185,69 @@ export default function MemoListPage() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0F7FF", padding: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
   },
-  title: { fontSize: 24, fontWeight: "700", color: "#1E40AF" },
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
   subtitle: {
     textAlign: "center",
-    color: "#555",
+    color: "#64748B",
     fontSize: 14,
     marginBottom: 16,
+    lineHeight: 20,
   },
   memoCard: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  memoText: { fontSize: 16, color: "#1F2937", flex: 1, marginRight: 12 },
-  emptyText: { textAlign: "center", color: "#94A3B8", marginTop: 50, fontSize: 16 },
-
+  memoText: {
+    fontSize: 16,
+    color: "#1E293B",
+    flex: 1,
+    marginRight: 12,
+  },
+  iconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#94A3B8",
+    marginTop: 50,
+    fontSize: 15,
+    lineHeight: 22,
+  },
   addButton: {
     position: "absolute",
     bottom: 30,
     right: 30,
-    backgroundColor: "#3B82F6",
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    backgroundColor: "#2563EB",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -175,8 +255,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 6,
   },
-  addButtonText: { fontSize: 40, color: "#fff", marginTop: -3 },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -185,27 +263,38 @@ const styles = StyleSheet.create({
   },
   modalBox: {
     backgroundColor: "#fff",
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 22,
     width: "80%",
     alignItems: "center",
   },
-  modalTitle: { fontSize: 20, fontWeight: "600", color: "#1E3A8A", marginBottom: 10 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1E293B",
+    marginBottom: 10,
+  },
   modalInput: {
     borderWidth: 1,
     borderColor: "#CBD5E1",
-    borderRadius: 10,
+    borderRadius: 8,
     width: "100%",
-    padding: 12,
+    padding: 10,
     marginBottom: 14,
     fontSize: 16,
+    minHeight: 8,
+    textAlignVertical: "top",
   },
   modalButton: {
-    backgroundColor: "#3B82F6",
-    borderRadius: 10,
-    paddingVertical: 12,
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    paddingVertical: 10,
     paddingHorizontal: 24,
   },
-  modalButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-  cancelText: { color: "#6B7280", marginTop: 12, fontSize: 16 },
+  modalButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 15,
+  },
+  cancelText: { color: "#64748B", marginTop: 12, fontSize: 15 },
 });
