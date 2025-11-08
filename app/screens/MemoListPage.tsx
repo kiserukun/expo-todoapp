@@ -39,7 +39,6 @@ export default function MemoListPage() {
     await saveMemos(updated);
     setNewMemo("");
     setModalVisible(false);
-    Toast.show({ type: "success", text1: "教訓を追加しました📝" });
   };
 
   const handleDeleteMemo = async (id: number) => {
@@ -60,7 +59,7 @@ export default function MemoListPage() {
       </View>
 
       <Text style={styles.subtitle}>
-        過去の失敗や気づきをメモして{"\n"}定期的に振り返ろう ✨
+        過去の失敗や気づきをメモして{"\n"}定期的に振り返ろう
       </Text>
 
       {/* 🧠 メモリスト */}
@@ -80,6 +79,7 @@ export default function MemoListPage() {
               </TouchableOpacity>
             </View>
           )}
+          contentContainerStyle={{ paddingBottom: 120 }}
         />
       )}
 

@@ -143,7 +143,7 @@ export default function StatsPage() {
       <View style={styles.tipsCard}>
         <Ionicons name="sparkles" size={22} color="#3B82F6" />
         <Text style={styles.tipsText}>
-          日々少しずつでも続けることが大事。{"\n"}グラフが伸びていくのを楽しもう ✨
+          日々少しずつでも続けることが大事。{"\n"}グラフが伸びていくのを楽しもう
         </Text>
       </View>
     </ScrollView>

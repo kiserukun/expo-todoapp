@@ -83,7 +83,7 @@ export default function TaskListPage() {
 
     setNewTask("");
     setModalVisible(false);
-    Toast.show({ type: "success", text1: "タスクを追加しました" });
+
   };
 
   const handleDeleteTask = async (taskId: string) => {
@@ -156,15 +156,18 @@ export default function TaskListPage() {
         </Text>
       </View>
 
-      <DraggableFlatList
-        data={group.tasks}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        onDragEnd={({ data }) => {
-          const newGroups = groups.map((g) => (g.id === id ? { ...g, tasks: data } : g));
-          updateGroupData(newGroups);
-        }}
-      />
+      <View style={{ flex: 1 }}>
+        <DraggableFlatList
+          data={group.tasks}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          onDragEnd={({ data }) => {
+            const newGroups = groups.map((g) => (g.id === id ? { ...g, tasks: data } : g));
+            updateGroupData(newGroups);
+          }}
+          contentContainerStyle={{ paddingBottom: 120 }} // 👈 スクロール余白
+        />
+      </View>
 
       <TouchableOpacity
         style={styles.addButton}

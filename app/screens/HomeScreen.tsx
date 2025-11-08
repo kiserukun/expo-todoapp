@@ -35,7 +35,7 @@ const HomeScreen = () => {
   const handleAddGroup = async () => {
     if (!newGroupName.trim()) return;
     await addGroup(newGroupName.trim());
-    setNewGroupName("");
+    setNewGroupName(""); // ← 追加後にリセット
     setModalVisible(false);
     fetchGroups();
   };
@@ -47,26 +47,31 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* MemoList ページ */}
+      {/* 教訓ノートボタン */}
       <TouchableOpacity
-        style={styles.memoButton}
+        style={[styles.menuButton, { backgroundColor: "#FBBF24" }]}
         onPress={() => navigation.navigate("MemoList")}
       >
-        <Text style={styles.memoButtonText}>過去の教訓を見る</Text>
+        <View style={styles.menuContent}>
+          <Ionicons name="book-outline" size={22} color="white" style={styles.icon} />
+          <Text style={styles.menuButtonText}>教訓ノート</Text>
+        </View>
       </TouchableOpacity>
 
       {/* 達成グラフボタン */}
       <TouchableOpacity
-        style={[styles.memoButton, { backgroundColor: "#3B82F6" }]}
+        style={[styles.menuButton, { backgroundColor: "#38BDF8" }]}
         onPress={() => navigation.navigate("Stats")}
       >
-        <Text style={[styles.memoText, { color: "white" }]}>
-          達成グラフを見る
-        </Text>
+        <View style={styles.menuContent}>
+          <Ionicons name="bar-chart-outline" size={22} color="white" style={styles.icon} />
+          <Text style={styles.menuButtonText}>達成グラフ</Text>
+        </View>
       </TouchableOpacity>
 
-      <Text style={styles.header}>グループ一覧</Text>
+      <Text style={styles.header}>マイリスト</Text>
 
+      {/* グループ一覧 */}
       <FlatList
         data={groups}
         keyExtractor={(item) => item.id}
@@ -79,19 +84,23 @@ const HomeScreen = () => {
               <Text style={styles.groupText}>{item.name}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => handleDeleteGroup(item.id)}>
-              <Ionicons name="trash" size={24} color="#878282ff" />
+              <Ionicons name="trash" size={24} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
         )}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>グループがありません 🌤️</Text>
+          <Text style={styles.emptyText}>まだリストがありません</Text>
         }
+        contentContainerStyle={{ paddingBottom: 120 }}
       />
 
       {/* グループ追加ボタン */}
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => setModalVisible(true)}
+        onPress={() => {
+          setNewGroupName(""); // ← モーダルを開く前に入力内容をリセット
+          setModalVisible(true);
+        }}
       >
         <Text style={{ color: "#fff", fontSize: 36 }}>＋</Text>
       </TouchableOpacity>
@@ -100,9 +109,9 @@ const HomeScreen = () => {
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>新しいグループ</Text>
+            <Text style={styles.modalTitle}>新しいリストを作成</Text>
             <TextInput
-              placeholder="グループ名"
+              placeholder="リスト名を入力..."
               value={newGroupName}
               onChangeText={setNewGroupName}
               style={styles.modalInput}
@@ -114,7 +123,7 @@ const HomeScreen = () => {
             <TouchableOpacity
               onPress={() => {
                 setModalVisible(false);
-                setNewGroupName("");
+                setNewGroupName(""); // ← キャンセル時もリセット
               }}
             >
               <Text style={styles.cancelText}>キャンセル</Text>
@@ -130,7 +139,12 @@ export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F0F7FF", padding: 16 },
-  header: { fontSize: 24, fontWeight: "bold", marginVertical: 12 },
+  header: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#1E3A8A",
+    marginVertical: 12,
+  },
   groupCard: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -146,7 +160,6 @@ const styles = StyleSheet.create({
   },
   groupContent: { flex: 1 },
   groupText: { fontSize: 18, color: "#1E3A8A" },
-  deleteIcon: { fontSize: 22, color: "#F87171" }, // 少し抑えた赤
   addButton: {
     position: "absolute",
     bottom: 30,
@@ -162,8 +175,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 6,
   },
-  emptyText: { textAlign: "center", color: "#94A3B8", marginTop: 30, fontSize: 16 },
-
+  emptyText: {
+    textAlign: "center",
+    color: "#94A3B8",
+    marginTop: 30,
+    fontSize: 16,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -196,14 +213,29 @@ const styles = StyleSheet.create({
   },
   modalButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
   cancelText: { color: "#6B7280", fontSize: 16, marginTop: 4 },
-
-  memoButton: {
-    backgroundColor: "#FACC15",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+  menuButton: {
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3,
+  },
+  menuButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  menuContent: {
+    flexDirection: "row",
     alignItems: "center",
   },
-  memoButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  memoText: { fontSize: 16, fontWeight: "bold" },
+  icon: {
+    marginRight: 8,
+  },
 });
