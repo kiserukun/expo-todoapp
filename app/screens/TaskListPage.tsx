@@ -196,7 +196,7 @@ export default function TaskListPage() {
               autoFocus
             />
             <TouchableOpacity style={styles.modalButton} onPress={handleAddTask}>
-              <Text style={styles.modalButtonText}>追加する 🌷</Text>
+              <Text style={styles.modalButtonText}>追加する</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {

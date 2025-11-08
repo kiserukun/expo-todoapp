@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
@@ -37,11 +38,7 @@ const addDays = (baseDate: string | Date, n: number): string => {
   return d.toISOString().slice(0, 10);
 };
 
-type StatData = {
-  date: string;
-  value: number;
-  label: string;
-};
+type StatData = { date: string; value: number; label: string };
 
 export default function StatsPage() {
   const navigation = useNavigation<NavigationProp>();
@@ -54,7 +51,6 @@ export default function StatsPage() {
         const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
         const raw = await AsyncStorage.getItem("stats");
         let parsed: Record<string, any> = {};
-
         try {
           parsed = raw ? JSON.parse(raw) : {};
         } catch {
@@ -62,13 +58,14 @@ export default function StatsPage() {
         }
 
         let arr = Object.entries(parsed)
-          .map(([date, value]) => {
-            const num = Number.isFinite(+value!) ? +value! : 0;
-            return { date, value: num, label: toShortLabel(date) };
-          })
+          .map(([date, value]) => ({
+            date,
+            value: Number.isFinite(+value!) ? +value! : 0,
+            label: toShortLabel(date),
+          }))
           .sort((a, b) => (a.date < b.date ? -1 : 1));
 
-        // ✅ データが7日分になるよう補完
+        // ✅ データ補完
         if (arr.length > 0) {
           const lastDate = arr[arr.length - 1].date;
           while (arr.length < 7) {
@@ -95,95 +92,108 @@ export default function StatsPage() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* ヘッダー */}
+      {/* 💙 ヘッダー */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("Home")}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>← 戻る</Text>
+        <TouchableOpacity onPress={() => navigation.navigate("Home")} style={styles.iconButton}>
+          <Ionicons name="chevron-back" size={30} color="#6B7280" />
         </TouchableOpacity>
-        <Text style={styles.title}>達成数グラフ</Text>
+        <Text style={styles.title}>今週のがんばり</Text>
+        <View style={{ width: 30 }} />
       </View>
 
-      {/* グラフ */}
-      {data.length === 0 ? (
-        <Text style={styles.emptyText}>
-          まだ達成データがありません。タスクを完了すると自動で記録されます 📊
-        </Text>
-      ) : (
-        <View style={styles.chartContainer}>
+      <Text style={styles.subtitle}>小さな積み重ねが、あなたの力になる</Text>
+
+      {/* 📊 グラフカード */}
+      <View style={styles.chartCard}>
+        {data.length === 0 ? (
+          <Text style={styles.emptyText}>
+            まだ達成データがありません。タスクを完了すると自動で記録されます
+          </Text>
+        ) : (
           <BarChart
             data={{
-              labels: labels,
+              labels,
               datasets: [{ data: values }],
             }}
-            width={Dimensions.get("window").width - 40}
-            height={250}
+            width={Dimensions.get("window").width - 60}
+            height={260}
             fromZero
             showValuesOnTopOfBars
-            yAxisLabel=""          // ✅ 追加
-            yAxisSuffix=""         // ✅ 追加
+            yAxisLabel=""
+            yAxisSuffix=""
             chartConfig={{
               backgroundColor: "#fff",
-              backgroundGradientFrom: "#fff",
+              backgroundGradientFrom: "#E0ECFF",
               backgroundGradientTo: "#fff",
               decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(49, 130, 206, ${opacity})`,
-              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              style: { borderRadius: 16 },
+              color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(30, 41, 59, ${opacity})`,
               propsForBackgroundLines: {
                 strokeWidth: 1,
-                stroke: "#e3e3e3",
+                stroke: "#E2E8F0",
               },
+              style: { borderRadius: 16 },
             }}
-            style={{
-              marginVertical: 8,
-              borderRadius: 16,
-            }}
+            style={{ marginVertical: 8, borderRadius: 16 }}
           />
-        </View>
-      )}
+        )}
+      </View>
+
+      {/* 📅 解説カード */}
+      <View style={styles.tipsCard}>
+        <Ionicons name="sparkles" size={22} color="#3B82F6" />
+        <Text style={styles.tipsText}>
+          日々少しずつでも続けることが大事。{"\n"}グラフが伸びていくのを楽しもう ✨
+        </Text>
+      </View>
     </ScrollView>
   );
 }
 
-// ✅ スタイル
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#E6EEFF",
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: "#F0F7FF", padding: 20 },
   header: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  backButton: {
-    padding: 8,
-  },
-  backText: {
-    color: "#555",
-    fontSize: 16,
-  },
-  title: {
-    flex: 1,
+  iconButton: { padding: 4 },
+  title: { fontSize: 26, fontWeight: "700", color: "#1E40AF" },
+  subtitle: {
     textAlign: "center",
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1E40AF",
+    color: "#475569",
+    fontSize: 15,
+    marginBottom: 18,
   },
-  chartContainer: {
+  chartCard: {
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 10,
-    elevation: 2,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+  },
+  tipsCard: {
+    backgroundColor: "#DBEAFE",
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  tipsText: {
+    marginLeft: 10,
+    color: "#1E3A8A",
+    fontSize: 15,
+    flexShrink: 1,
   },
   emptyText: {
     textAlign: "center",
-    color: "gray",
-    marginTop: 30,
+    color: "#94A3B8",
     fontSize: 15,
+    padding: 20,
   },
 });
