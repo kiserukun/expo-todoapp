@@ -8,10 +8,14 @@
       "./@types"
     ],
     "paths": {
+      "@utils/*": [
+        "app/utils/*"
+      ],
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "baseUrl": ".",
   },
   "include": [
     "**/*.ts",

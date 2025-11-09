@@ -46,7 +46,7 @@ export default function SplashScreen() {
         style={styles.container}
       >
         <Animatable.View animation="fadeIn" duration={1200} style={styles.innerContainer}>
-          <Text style={styles.title}>今日のひとこと</Text>
+          <Text style={styles.title}>ひとこと</Text>
 
           <Animatable.Text
             animation="fadeInUp"

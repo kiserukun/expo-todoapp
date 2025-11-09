@@ -1,208 +1,144 @@
+// StatsPage.tsx - ADHD向けに優しく再設計したグラフ画面
+
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
+import { LinearGradient as ExpoLinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
-import {
-  Dimensions,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BarChart } from "react-native-chart-kit";
 
-type RootStackParamList = {
-  Home: undefined;
-  Stats: undefined;
-};
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Stats">;
-
-// ✅ 日付を短く整形
-const toShortLabel = (iso: string): string => {
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  } catch {
-    return iso;
-  }
-};
-
-// ✅ 日付加算関数
-const addDays = (baseDate: string | Date, n: number): string => {
-  const d = new Date(baseDate);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-};
-
-type StatData = { date: string; value: number; label: string };
+const screenWidth = Dimensions.get("window").width - 40;
+const STORAGE_KEY = "stats";
 
 export default function StatsPage() {
-  const navigation = useNavigation<NavigationProp>();
-  const [data, setData] = useState<StatData[]>([]);
+  const [stats, setStats] = useState<{ [date: string]: number }>({});
+  const isFocused = useIsFocused();
+  const navigation = useNavigation();
 
-  // ✅ データ取得
   useEffect(() => {
-    (async () => {
-      try {
-        const AsyncStorage = (await import("@react-native-async-storage/async-storage")).default;
-        const raw = await AsyncStorage.getItem("stats");
-        let parsed: Record<string, any> = {};
-        try {
-          parsed = raw ? JSON.parse(raw) : {};
-        } catch {
-          parsed = {};
-        }
+    const fetchStats = async () => {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      setStats(stored ? JSON.parse(stored) : {});
+    };
+    if (isFocused) fetchStats();
+  }, [isFocused]);
 
-        let arr = Object.entries(parsed)
-          .map(([date, value]) => ({
-            date,
-            value: Number.isFinite(+value!) ? +value! : 0,
-            label: toShortLabel(date),
-          }))
-          .sort((a, b) => (a.date < b.date ? -1 : 1));
-
-        // ✅ 日数を7日に揃える
-        if (arr.length > 0) {
-          const base = arr[arr.length - 1].date;
-          while (arr.length < 7) {
-            const nextDate = addDays(base, arr.length - (arr.length - 1));
-            arr.push({ date: nextDate, value: 0, label: toShortLabel(nextDate) });
-          }
-        } else {
-          const today = new Date().toISOString().slice(0, 10);
-          arr = Array.from({ length: 7 }, (_, i) => {
-            const date = addDays(today, i);
-            return { date, value: 0, label: toShortLabel(date) };
-          });
-        }
-
-        setData(arr);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, []);
-
-  const values = data.map((d) => d.value);
-  const labels = data.map((d) => d.label);
+  // 日付整形
+  const sortedKeys = Object.keys(stats).sort();
+  const recentKeys = sortedKeys.slice(-7);
+  const labels = recentKeys.map((d) => d.slice(5).replace("-", "/"));
+  const data = recentKeys.map((k) => stats[k]);
 
   return (
-    <ScrollView style={styles.container}>
+    <ExpoLinearGradient colors={["#E0F2FE", "#FFFFFF"]} style={styles.container}>
       {/* 💙 ヘッダー */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("Home")}
-          style={styles.iconButton}
-        >
-          <Ionicons name="chevron-back" size={28} color="#6B7280" />
+      <View style={styles.headerCard}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={28} color="#1E3A8A" />
         </TouchableOpacity>
-        <Text style={styles.title}>達成グラフ</Text>
+        <Text style={styles.headerTitle}>達成グラフ</Text>
         <View style={{ width: 28 }} />
       </View>
 
-      <Text style={styles.subtitle}>小さな積み重ねが、大きな力になる</Text>
-
-      {/* 📊 グラフカード */}
+      {/* 🌿 シンプルな棒グラフ */}
       <View style={styles.chartCard}>
-        {data.length === 0 ? (
-          <Text style={styles.emptyText}>
-            まだ達成データがありません。
-            {"\n"}タスクを完了すると自動で記録されます。
-          </Text>
-        ) : (
+        <Text style={styles.chartTitle}>最近のあなたの積み上げ</Text>
+
+        {recentKeys.length > 0 ? (
           <BarChart
             data={{
               labels,
-              datasets: [{ data: values }],
+              datasets: [{ data }],
             }}
-            width={Dimensions.get("window").width - 60}
-            height={260}
+            width={screenWidth}
+            height={220}
             fromZero
-            showValuesOnTopOfBars
+            showValuesOnTopOfBars={true}
             yAxisLabel=""
             yAxisSuffix=""
+            withInnerLines={false} // ← 点線なし
+            withHorizontalLabels={false} // ← y軸ラベルなし
             chartConfig={{
               backgroundGradientFrom: "#FFFFFF",
               backgroundGradientTo: "#FFFFFF",
+              fillShadowGradient: "#3B82F6",
+              fillShadowGradientOpacity: 0.9,
+              barPercentage: 0.55,
               decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
+              color: () => "#3B82F6",
               labelColor: (opacity = 1) => `rgba(30, 41, 59, ${opacity})`,
-              propsForBackgroundLines: {
-                strokeWidth: 1,
-                stroke: "#E2E8F0",
+              propsForLabels: {
+                fontSize: 14,
+                fontWeight: "600",
               },
             }}
-            style={styles.chart}
+            style={styles.chartStyle}
           />
+        ) : (
+          <Text style={styles.emptyText}>
+            まだ達成データがありません{"\n"}今日の「できた」を記録してみよう。
+          </Text>
         )}
       </View>
 
-      {/* 📅 アドバイスカード */}
-      <View style={styles.tipCard}>
-        <Ionicons name="sparkles" size={22} color="#2563EB" />
-        <Text style={styles.tipText}>
-          毎日少しずつの積み上げが大事。
-          {"\n"}グラフが伸びるのを楽しもう！
-        </Text>
-      </View>
-    </ScrollView>
+      <Text style={styles.encourageText}>
+        完璧じゃなくていい。少しずつで大丈夫。
+      </Text>
+    </ExpoLinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF", padding: 20 },
-  header: {
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  headerCard: {
+    backgroundColor: "#FFFFFFCC",
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    marginBottom: 20,
   },
-  iconButton: { padding: 4 },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-  subtitle: {
-    textAlign: "center",
-    color: "#64748B",
-    fontSize: 14,
-    marginBottom: 18,
-  },
+  headerTitle: { color: "#1E3A8A", fontSize: 20, fontWeight: "700" },
   chartCard: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: "center",
+    backgroundColor: "#FFFFFFEE",
+    borderRadius: 18,
+    paddingVertical: 24,
     shadowColor: "#000",
     shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
-  },
-  chart: { marginVertical: 8, borderRadius: 16 },
-  tipCard: {
-    backgroundColor: "#DBEAFE",
-    borderRadius: 14,
-    padding: 14,
-    marginTop: 20,
-    flexDirection: "row",
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
     alignItems: "center",
   },
-  tipText: {
-    marginLeft: 10,
+  chartTitle: {
+    fontSize: 17,
+    fontWeight: "600",
     color: "#1E3A8A",
-    fontSize: 15,
-    flexShrink: 1,
-    lineHeight: 20,
+    marginBottom: 12,
+  },
+  chartStyle: {
+    borderRadius: 16,
+    marginVertical: 8,
   },
   emptyText: {
-    textAlign: "center",
-    color: "#94A3B8",
+    color: "#64748B",
     fontSize: 15,
-    padding: 20,
+    marginTop: 20,
+    textAlign: "center",
     lineHeight: 22,
+  },
+  encourageText: {
+    marginTop: 28,
+    textAlign: "center",
+    color: "#1E3A8A",
+    fontSize: 15,
+    fontStyle: "italic",
+    opacity: 0.8,
   },
 });

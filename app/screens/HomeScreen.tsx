@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import React, { useEffect, useState } from "react";
 import {
-  FlatList,
   Modal,
   Pressable,
   StyleSheet,
@@ -12,8 +12,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DraggableFlatList, {
+  RenderItemParams,
+} from "react-native-draggable-flatlist";
 import type { RootStackParamList } from "../index";
-import { addGroup, deleteGroup, Group, loadGroups, updateGroupName } from "../utils/storage";
+import {
+  addGroup,
+  deleteGroup,
+  Group,
+  loadGroups,
+  updateGroupName,
+} from "../utils/storage";
 
 type GroupListNav = StackNavigationProp<RootStackParamList, "Home">;
 
@@ -33,6 +42,12 @@ const HomeScreen = () => {
     const unsubscribe = navigation.addListener("focus", fetchGroups);
     return unsubscribe;
   }, [navigation]);
+
+  // 💾 順番保存
+  const saveOrder = async (newData: Group[]) => {
+    setGroups(newData);
+    await AsyncStorage.setItem("groups", JSON.stringify(newData));
+  };
 
   // 🟦 追加
   const handleAddGroup = async () => {
@@ -58,9 +73,46 @@ const HomeScreen = () => {
     fetchGroups();
   };
 
+  const renderItem = ({ item, drag, isActive }: RenderItemParams<Group>) => (
+    <Pressable
+      style={[
+        styles.groupCard,
+        isActive && { backgroundColor: "#E2E8F0" },
+      ]}
+      onLongPress={drag}
+      onPress={() => navigation.navigate("TaskList", { id: item.id })}
+    >
+      <Text style={styles.groupText}>{item.name}</Text>
+      <View style={styles.iconRow}>
+        {/* ✏️ 編集 */}
+        <TouchableOpacity
+          onPress={(e) => {
+            e.stopPropagation();
+            setEditGroupId(item.id);
+            setNewGroupName(item.name);
+            setModalVisible(true);
+          }}
+          style={{ marginRight: 12 }}
+        >
+          <Ionicons name="create-outline" size={22} color="#64748B" />
+        </TouchableOpacity>
+
+        {/* 🗑️ 削除 */}
+        <TouchableOpacity
+          onPress={(e) => {
+            e.stopPropagation();
+            handleDeleteGroup(item.id);
+          }}
+        >
+          <Ionicons name="trash-outline" size={22} color="#9CA3AF" />
+        </TouchableOpacity>
+      </View>
+    </Pressable>
+  );
+
   return (
     <View style={styles.container}>
-      {/* 教訓ノート＆達成グラフカード */}
+      {/* 教訓ノート＆グラフカード */}
       <View style={styles.menuContainer}>
         <TouchableOpacity
           style={styles.cardButton}
@@ -81,49 +133,15 @@ const HomeScreen = () => {
 
       <Text style={styles.header}>マイリスト</Text>
 
-      <FlatList
+      <DraggableFlatList
         data={groups}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Pressable
-            style={({ pressed }) => [
-              styles.groupCard,
-              pressed && { backgroundColor: "#E2E8F0" },
-            ]}
-            onPress={() => navigation.navigate("TaskList", { id: item.id })}
-          >
-            <Text style={styles.groupText}>{item.name}</Text>
-
-            <View style={styles.iconRow}>
-              {/* ✏️ 編集ボタン */}
-              <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  setEditGroupId(item.id);
-                  setNewGroupName(item.name);
-                  setModalVisible(true);
-                }}
-                style={{ marginRight: 12 }}
-              >
-                <Ionicons name="create-outline" size={22} color="#64748B" />
-              </TouchableOpacity>
-
-              {/* 🗑️ 削除ボタン */}
-              <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleDeleteGroup(item.id);
-                }}
-              >
-                <Ionicons name="trash-outline" size={22} color="#9CA3AF" />
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        )}
+        onDragEnd={({ data }) => saveOrder(data)}
+        renderItem={renderItem}
         ListEmptyComponent={
           <Text style={styles.emptyText}>まだリストがありません</Text>
         }
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 220 }}
       />
 
       {/* ➕ 追加ボタン */}
@@ -138,7 +156,7 @@ const HomeScreen = () => {
         <Ionicons name="add" size={32} color="#fff" />
       </TouchableOpacity>
 
-      {/* モーダル（追加・編集兼用） */}
+      {/* ✨ モーダル */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -154,24 +172,29 @@ const HomeScreen = () => {
               autoFocus
             />
 
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={editGroupId ? handleEditGroup : handleAddGroup}
-            >
-              <Text style={styles.modalButtonText}>
-                {editGroupId ? "更新する" : "追加する"}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: "#2563EB" }]}
+                onPress={editGroupId ? handleEditGroup : handleAddGroup}
+              >
+                <Text style={styles.modalButtonText}>
+                  {editGroupId ? "更新" : "追加"}
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => {
-                setModalVisible(false);
-                setNewGroupName("");
-                setEditGroupId(null);
-              }}
-            >
-              <Text style={styles.cancelText}>キャンセル</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: "#E5E7EB" }]}
+                onPress={() => {
+                  setModalVisible(false);
+                  setNewGroupName("");
+                  setEditGroupId(null);
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: "#374151" }]}>
+                  キャンセル
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -180,13 +203,6 @@ const HomeScreen = () => {
 };
 
 export default HomeScreen;
-
-// 🧩 storage.ts に以下の関数を追加
-// export const updateGroupName = async (id: string, newName: string) => {
-//   const stored = await loadGroups();
-//   const updated = stored.map((g) => (g.id === id ? { ...g, name: newName } : g));
-//   await AsyncStorage.setItem("groups", JSON.stringify(updated));
-// };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF", paddingHorizontal: 20, paddingTop: 16 },
@@ -220,7 +236,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowRadius: 2,
   },
-  groupText: { fontSize: 16, color: "#1E293B" },
+  groupText: { fontSize: 16, color: "#1E293B", flex: 1 },
   iconRow: { flexDirection: "row", alignItems: "center" },
   addButton: {
     position: "absolute",
@@ -252,10 +268,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     width: "100%",
     padding: 10,
-    marginBottom: 12,
+    marginBottom: 16,
     fontSize: 16,
   },
-  modalButton: { backgroundColor: "#2563EB", borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20, marginBottom: 6 },
+  modalButtonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
   modalButtonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
-  cancelText: { color: "#64748B", fontSize: 15, marginTop: 4 },
 });

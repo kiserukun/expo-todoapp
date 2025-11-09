@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
+import { LinearGradient as ExpoLinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  FlatList,
   Modal,
   StyleSheet,
   Text,
@@ -12,15 +12,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
 import Toast from "react-native-toast-message";
 
-type Memo = { id: number; text: string };
+type Memo = { id: string; text: string };
 
 export default function MemoListPage() {
   const navigation = useNavigation();
   const [memos, setMemos] = useState<Memo[]>([]);
   const [newMemo, setNewMemo] = useState("");
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [isModalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
@@ -41,12 +42,12 @@ export default function MemoListPage() {
 
     if (editId !== null) {
       // 編集
-      updated = memos.map((m) => (m.id === editId ? { ...m, text: newMemo.trim() } : m));
-
+      updated = memos.map((m) =>
+        m.id === editId ? { ...m, text: newMemo.trim() } : m
+      );
     } else {
       // 追加
-      updated = [...memos, { id: Date.now(), text: newMemo.trim() }];
-
+      updated = [...memos, { id: Date.now().toString(), text: newMemo.trim() }];
     }
 
     await saveMemos(updated);
@@ -55,7 +56,7 @@ export default function MemoListPage() {
     setModalVisible(false);
   };
 
-  const handleDeleteMemo = async (id: number) => {
+  const handleDeleteMemo = async (id: string) => {
     Alert.alert("削除確認", "この教訓を削除しますか？", [
       { text: "キャンセル", style: "cancel" },
       {
@@ -64,25 +65,52 @@ export default function MemoListPage() {
         onPress: async () => {
           const updated = memos.filter((m) => m.id !== id);
           await saveMemos(updated);
-
         },
       },
     ]);
   };
 
+  const renderItem = ({ item, drag, isActive }: RenderItemParams<Memo>) => (
+    <TouchableOpacity
+      style={[
+        styles.memoCard,
+        isActive && { backgroundColor: "#E0F2FE" },
+      ]}
+      onLongPress={drag} // ✅ 長押しで並び替え
+      delayLongPress={150}
+    >
+      <Text style={styles.memoText}>{item.text}</Text>
+      <View style={styles.iconRow}>
+        <TouchableOpacity
+          onPress={() => {
+            setEditId(item.id);
+            setNewMemo(item.text);
+            setModalVisible(true);
+          }}
+          style={{ marginRight: 10 }}
+        >
+          <Ionicons name="create-outline" size={22} color="#64748B" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleDeleteMemo(item.id)}>
+          <Ionicons name="trash-outline" size={22} color="#9CA3AF" />
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
-    <View style={styles.container}>
+    <ExpoLinearGradient colors={["#E0F2FE", "#FFFFFF"]} style={styles.container}>
       {/* 💙 ヘッダー */}
-      <View style={styles.header}>
+      <View style={styles.headerCard}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={28} color="#6B7280" />
+          <Ionicons name="chevron-back" size={28} color="#1E3A8A" />
         </TouchableOpacity>
         <Text style={styles.title}>教訓ノート</Text>
         <View style={{ width: 28 }} />
       </View>
 
       <Text style={styles.subtitle}>
-        過去の失敗や気づきを記録して{"\n"}定期的に振り返ろう
+        過去の失敗や気づきを記録して{"\n"}未来の自分に活かそう
       </Text>
 
       {/* 🧠 メモリスト */}
@@ -91,51 +119,27 @@ export default function MemoListPage() {
           まだ教訓がありません。{"\n"}右下の「＋」から追加できます。
         </Text>
       ) : (
-        <FlatList
+        <DraggableFlatList
           data={memos}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.memoCard}
-              onPress={() => {
-                setEditId(item.id);
-                setNewMemo(item.text);
-                setModalVisible(true);
-              }}
-            >
-              <Text style={styles.memoText}>{item.text}</Text>
-              <View style={styles.iconRow}>
-                <TouchableOpacity
-                  onPress={() => {
-                    setEditId(item.id);
-                    setNewMemo(item.text);
-                    setModalVisible(true);
-                  }}
-                  style={{ marginRight: 10 }}
-                >
-
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDeleteMemo(item.id)}>
-                  <Ionicons name="trash-outline" size={22} color="#9CA3AF" />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          )}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          onDragEnd={({ data }) => saveMemos(data)} // ✅ 並び替え保存
+          contentContainerStyle={{ paddingBottom: 220 }}
         />
       )}
 
       {/* ➕ 追加ボタン */}
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => {
-          setEditId(null);
-          setNewMemo("");
-          setModalVisible(true);
-        }}
-      >
-        <Ionicons name="add" size={32} color="#fff" />
-      </TouchableOpacity>
+      <ExpoLinearGradient colors={["#60A5FA", "#3B82F6"]} style={styles.addButton}>
+        <TouchableOpacity
+          onPress={() => {
+            setEditId(null);
+            setNewMemo("");
+            setModalVisible(true);
+          }}
+        >
+          <Ionicons name="add" size={34} color="#fff" />
+        </TouchableOpacity>
+      </ExpoLinearGradient>
 
       {/* ✨ モーダル（追加・編集共通） */}
       <Modal
@@ -161,64 +165,67 @@ export default function MemoListPage() {
               autoFocus
               multiline
             />
-            <TouchableOpacity style={styles.modalButton} onPress={handleAddOrEditMemo}>
-              <Text style={styles.modalButtonText}>
-                {editId ? "更新する" : "追加する"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                setModalVisible(false);
-                setNewMemo("");
-                setEditId(null);
-              }}
-            >
-              <Text style={styles.cancelText}>キャンセル</Text>
-            </TouchableOpacity>
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: "#3B82F6" }]}
+                onPress={handleAddOrEditMemo}
+              >
+                <Text style={styles.modalButtonText}>
+                  {editId ? "更新" : "追加"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: "#E2E8F0" }]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: "#475569" }]}>
+                  キャンセル
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
       <Toast />
-    </View>
+    </ExpoLinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  headerCard: {
+    backgroundColor: "#FFFFFFCC",
+    borderRadius: 14,
+    paddingVertical: 14,
     paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    marginBottom: 20,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
+  title: { fontSize: 20, fontWeight: "700", color: "#1E3A8A" },
   subtitle: {
     textAlign: "center",
-    color: "#64748B",
-    fontSize: 14,
-    marginBottom: 16,
-    lineHeight: 20,
+    color: "#475569",
+    fontSize: 15,
+    marginBottom: 18,
+    lineHeight: 22,
   },
   memoCard: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 10,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
+    shadowRadius: 3,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -244,10 +251,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 30,
     right: 30,
-    backgroundColor: "#2563EB",
-    width: 60,
-    height: 60,
     borderRadius: 30,
+    width: 65,
+    height: 65,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -265,36 +271,32 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 16,
     padding: 22,
-    width: "80%",
+    width: "85%",
     alignItems: "center",
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1E293B",
-    marginBottom: 10,
-  },
+  modalTitle: { fontSize: 18, fontWeight: "600", color: "#1E293B", marginBottom: 10 },
   modalInput: {
     borderWidth: 1,
     borderColor: "#CBD5E1",
     borderRadius: 8,
     width: "100%",
     padding: 10,
-    marginBottom: 14,
+    marginBottom: 16,
     fontSize: 16,
-    minHeight: 8,
+    minHeight: 80,
     textAlignVertical: "top",
   },
+  modalButtonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
   modalButton: {
-    backgroundColor: "#2563EB",
+    flex: 1,
     borderRadius: 8,
     paddingVertical: 10,
-    paddingHorizontal: 24,
+    marginHorizontal: 5,
+    alignItems: "center",
   },
-  modalButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 15,
-  },
-  cancelText: { color: "#64748B", marginTop: 12, fontSize: 15 },
+  modalButtonText: { color: "#fff", fontWeight: "600", fontSize: 15 },
 });
