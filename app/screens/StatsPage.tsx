@@ -1,4 +1,4 @@
-// StatsPage.tsx - ADHD向けに優しく再設計したグラフ画面
+// StatsPage.tsx - ADHD向けに視認性を強化したグラフ画面
 
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -26,9 +26,24 @@ export default function StatsPage() {
 
   // 日付整形
   const sortedKeys = Object.keys(stats).sort();
-  const recentKeys = sortedKeys.slice(-7);
-  const labels = recentKeys.map((d) => d.slice(5).replace("-", "/"));
-  const data = recentKeys.map((k) => stats[k]);
+
+  // 今日から過去7日分の日付を生成
+  const today = new Date();
+  const recentKeys = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (6 - i)); // 6日前から今日まで
+    return d.toISOString().slice(0, 10); // yyyy-mm-dd 形式
+  });
+
+  // 曜日ラベル生成
+  const getDayOfWeek = (dateStr: string) => {
+    const days = ["日", "月", "火", "水", "木", "金", "土"];
+    const d = new Date(dateStr);
+    return days[d.getDay()];
+  };
+
+  const labels = recentKeys.map((d) => getDayOfWeek(d));
+  const data = recentKeys.map((k) => stats[k] || 0); // ← データがない日は0
 
   return (
     <ExpoLinearGradient colors={["#E0F2FE", "#FFFFFF"]} style={styles.container}>
@@ -41,7 +56,7 @@ export default function StatsPage() {
         <View style={{ width: 28 }} />
       </View>
 
-      {/* 🌿 シンプルな棒グラフ */}
+      {/* 🌿 視認性を高めた棒グラフ */}
       <View style={styles.chartCard}>
         <Text style={styles.chartTitle}>最近のあなたの積み上げ</Text>
 
@@ -52,25 +67,29 @@ export default function StatsPage() {
               datasets: [{ data }],
             }}
             width={screenWidth}
-            height={220}
+            height={230}
             fromZero
-            showValuesOnTopOfBars={true}
+            showValuesOnTopOfBars
             yAxisLabel=""
             yAxisSuffix=""
-            withInnerLines={false} // ← 点線なし
-            withHorizontalLabels={false} // ← y軸ラベルなし
+            withInnerLines={true} // ← 補助線ありで比較しやすく
+            withHorizontalLabels={true} // ← y軸ラベルを表示
+            segments={4} // ← y軸目盛りを4段階に
             chartConfig={{
               backgroundGradientFrom: "#FFFFFF",
               backgroundGradientTo: "#FFFFFF",
-              fillShadowGradient: "#3B82F6",
-              fillShadowGradientOpacity: 0.9,
               barPercentage: 0.55,
               decimalPlaces: 0,
-              color: () => "#3B82F6",
+              color: (opacity = 1) => `rgba(30, 64, 175, ${opacity})`, // ← 濃い青系
               labelColor: (opacity = 1) => `rgba(30, 41, 59, ${opacity})`,
               propsForLabels: {
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: "600",
+              },
+              propsForBackgroundLines: {
+                strokeDasharray: "", // 実線でスッキリ
+                strokeWidth: 0.5,
+                stroke: "#CBD5E1", // 薄いグレー
               },
             }}
             style={styles.chartStyle}

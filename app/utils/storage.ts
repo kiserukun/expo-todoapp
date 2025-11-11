@@ -25,7 +25,11 @@ export const saveGroups = async (groups: Group[]) => {
 
 export const addGroup = async (name: string) => {
   const groups = await loadGroups();
-  const newGroup: Group = { id: Date.now().toString(), name, tasks: [] };
+  const newGroup: Group = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    name,
+    tasks: [],
+  };
   const updated = [...groups, newGroup];
   await saveGroups(updated);
   return newGroup;
